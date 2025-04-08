@@ -28,6 +28,21 @@ sqs = boto3.client("sqs", region_name=AWS_REGION)
 conn = psycopg2.connect(DB_URL)
 cursor = conn.cursor()
 
+# Create table if not exists
+
+# cursor.execute("""
+# CREATE TABLE IF NOT EXISTS email_responses (
+#     id SERIAL PRIMARY KEY,
+#     sender TEXT,
+#     subject TEXT,
+#     body TEXT,
+#     category TEXT,
+#     issue_summary TEXT,
+#     suggested_response TEXT,
+#     processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+# );
+# """)
+# conn.commit()
 
 class EmailPayload(BaseModel):
     sender: str
@@ -89,6 +104,24 @@ def process_email(payload: EmailPayload):
     )
     return response.choices[0].message['content']
 
+def store_result(payload: EmailPayload, result_json: str):
+    try:
+        result = json.loads(result_json)
+        category = result.get("Category")
+        issue_summary = result.get("Issue Summary")
+        suggested_response = result.get("Suggested Response")
+
+        cursor.execute(
+            """
+            INSERT INTO email_responses (sender, subject, body, category, issue_summary, suggested_response)
+            VALUES (%s, %s, %s, %s, %s, %s);
+            """,
+            (payload.sender, payload.subject, payload.body, category, issue_summary, suggested_response)
+        )
+        conn.commit()
+    except Exception as e:
+        print("Error storing result to DB:", e)
+
 def consume_from_sqs():
     while True:
         response = sqs.receive_message(
@@ -104,6 +137,7 @@ def consume_from_sqs():
                 payload = EmailPayload(**payload_dict)
 
                 result = process_email(payload)
+                store_result(payload, result)
                 print("Processed Result:", result)
 
                 sqs.delete_message(

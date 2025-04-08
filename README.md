@@ -1,6 +1,6 @@
 # ai-emailer
 Pet project for an AI email processing and response. This is based of an imaginary e-commerce store business.
-
+ - The assumption here is that there is already have a database with an `email_response` table if not update your `.env` file to contain the `DATABASE_URL` and create the table as per the `db.sql` query. Tests will be added over time.
 
 ## Scope
 Building an AI system that can:
