@@ -10,6 +10,7 @@ import openai
 import os
 import psycopg2
 import time
+import threading
 
 app = FastAPI()
 load_dotenv()
@@ -148,3 +149,8 @@ def consume_from_sqs():
                 print("Error processing message:", e)
 
         time.sleep(1)
+
+# scale with celery and task queues later
+@app.on_event("startup")
+def startup_event():
+    threading.Thread(target=consume_from_sqs, daemon=True).start()
