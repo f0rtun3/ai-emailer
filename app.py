@@ -1,13 +1,15 @@
 from fastapi import FastAPI, BackgroundTasks
+from dotenv import load_dotenv
 from pydantic import BaseModel
 from typing import Optional
-from dotenv import load_dotenv
 import boto3
-import imaplib
 import email
-import os
+import imaplib
+import json
 import openai
+import os
 import psycopg2
+import time
 
 app = FastAPI()
 load_dotenv()
@@ -88,4 +90,27 @@ def process_email(payload: EmailPayload):
     return response.choices[0].message['content']
 
 def consume_from_sqs():
-    pass
+    while True:
+        response = sqs.receive_message(
+            QueueUrl=SQS_QUEUE_URL,
+            MaxNumberOfMessages=5,
+            WaitTimeSeconds=10
+        )
+
+        messages = response.get("Messages", [])
+        for msg in messages:
+            try:
+                payload_dict = json.loads(msg["Body"])
+                payload = EmailPayload(**payload_dict)
+
+                result = process_email(payload)
+                print("Processed Result:", result)
+
+                sqs.delete_message(
+                    QueueUrl=SQS_QUEUE_URL,
+                    ReceiptHandle=msg["ReceiptHandle"]
+                )
+            except Exception as e:
+                print("Error processing message:", e)
+
+        time.sleep(1)
